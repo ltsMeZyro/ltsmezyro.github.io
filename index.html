@@ -1214,19 +1214,21 @@ document.getElementById("copies").addEventListener("click", async e => {
 /* ================================================================
    STATS
    ================================================================ */
-// views: persistent per-browser counter layered on viewBase
-const VKEY = "biopage:views:" + location.host;
-const SKEY = "biopage:session:" + location.host;
-let views = CONFIG.viewBase + 1;
-try{
-  let stored = parseInt(localStorage.getItem(VKEY) || "0", 10);
-  if (!sessionStorage.getItem(SKEY)) {          // count at most one view per browser session
-    stored += 1;
-    localStorage.setItem(VKEY, String(stored));
-    sessionStorage.setItem(SKEY, "1");
-  }
-  views = CONFIG.viewBase + stored;
-}catch(e){ views = CONFIG.viewBase + 1; }
+// Real shared view counter via abacus (abacus.jasoncameron.dev)
+// No API key needed for public endpoints; keeps a single global count.
+const COUNTER_NAME = "zyro-views";  // unique name for this page
+let views = 0;
+
+// Fire-and-forget increment, then fetch current count
+(async () => {
+  try {
+    await fetch("https://abacus.jasoncameron.dev/" + COUNTER_NAME, { method: "POST", mode: "cors" });
+  } catch(e) { /* ignore network failures */ }
+  try {
+    const r = await fetch("https://abacus.jasoncameron.dev/" + COUNTER_NAME, { mode: "cors" });
+    if (r.ok) views = await r.json();
+  } catch(e) { views = 0; }
+})();
 
 const since = new Date(CONFIG.since);
 const days = Math.max(0, Math.floor((Date.now() - since.getTime()) / 86400000));
@@ -1241,7 +1243,9 @@ function countUp(el, to, dur){
     if(p < 1) requestAnimationFrame(tick);
   })(start);
 }
-function setStats(){
+async function setStats(){
+  // wait for the counter fetch to finish (it runs at module load)
+  for (let i = 0; i < 100 && views === 0; i++) await new Promise(r => setTimeout(r, 50));
   countUp(document.getElementById("sViews"), views, 1400);
   countUp(document.getElementById("sUptime"), days, 1100);
   document.getElementById("sSince").textContent = since.toLocaleDateString("en-US",{month:"short",year:"numeric"}).toUpperCase();
