@@ -900,7 +900,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
     </div>
 
     <div class="stats reveal" style="--d:470ms">
-      <div class="stat"><div class="n" id="sViews">0</div><div class="l">Views</div></div>
+      <div class="stat"><div class="n" id="sViews">0</div><div class="l">Your Visits</div></div>
       <div class="stat"><div class="n" id="sUptime">0</div><div class="l">Days up</div></div>
       <div class="stat"><div class="n" id="sSince">—</div><div class="l">Online since</div></div>
     </div>
@@ -1214,21 +1214,20 @@ document.getElementById("copies").addEventListener("click", async e => {
 /* ================================================================
    STATS
    ================================================================ */
-// Real shared view counter via abacus (abacus.jasoncameron.dev)
-// No API key needed for public endpoints; keeps a single global count.
-const COUNTER_NAME = "zyro-views";  // unique name for this page
-let views = 0;
-
-// Fire-and-forget increment, then fetch current count
-(async () => {
-  try {
-    await fetch("https://abacus.jasoncameron.dev/" + COUNTER_NAME, { method: "POST", mode: "cors" });
-  } catch(e) { /* ignore network failures */ }
-  try {
-    const r = await fetch("https://abacus.jasoncameron.dev/" + COUNTER_NAME, { mode: "cors" });
-    if (r.ok) views = await r.json();
-  } catch(e) { views = 0; }
-})();
+// "Your Visits" — persistent per-browser counter (counts one visit per session).
+// This is real data: it tracks *your* visits on *this device/browser*.
+const VKEY = "biopage:visits:" + location.host;
+const SKEY = "biopage:session:" + location.host;
+let visits = 0;
+try {
+  let stored = parseInt(localStorage.getItem(VKEY) || "0", 10);
+  if (!sessionStorage.getItem(SKEY)) {          // count at most one visit per browser session
+    stored += 1;
+    localStorage.setItem(VKEY, String(stored));
+    sessionStorage.setItem(SKEY, "1");
+  }
+  visits = stored;
+} catch(e) { visits = 1; }
 
 const since = new Date(CONFIG.since);
 const days = Math.max(0, Math.floor((Date.now() - since.getTime()) / 86400000));
@@ -1243,10 +1242,8 @@ function countUp(el, to, dur){
     if(p < 1) requestAnimationFrame(tick);
   })(start);
 }
-async function setStats(){
-  // wait for the counter fetch to finish (it runs at module load)
-  for (let i = 0; i < 100 && views === 0; i++) await new Promise(r => setTimeout(r, 50));
-  countUp(document.getElementById("sViews"), views, 1400);
+function setStats(){
+  countUp(document.getElementById("sViews"), visits, 1400);
   countUp(document.getElementById("sUptime"), days, 1100);
   document.getElementById("sSince").textContent = since.toLocaleDateString("en-US",{month:"short",year:"numeric"}).toUpperCase();
 }
